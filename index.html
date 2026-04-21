@@ -200,29 +200,30 @@ button.cfg-btn.ok:hover    { border-color: var(--green);  background: rgba(0,232
 
 .section {
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: 14px 16px;
+  border-radius: 8px; padding: 30px 40px;
 }
 
 .sec-title {
   font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px;
   color: var(--text-dim); margin-bottom: 12px; padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
 }
 
 /* ─── joy.cpl XY PAD ────────────────────────────────────────── */
 .joy-layout {
-  display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;
+  display: flex; gap: 60px; align-items: center; justify-content: center; flex-wrap: nowrap;
 }
 
 /* The square XY area */
-.xy-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.xy-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
 
 .xy-pad {
   position: relative;
   width: 200px; height: 200px;
   background: var(--joy-box-bg);
-  border: 2px inset var(--border2);
-  box-shadow: inset 0 0 0 1px #0005, inset 2px 2px 6px #0008;
+  border: 1px solid var(--border2);
+  border-radius: 50%;
   cursor: crosshair;
   flex-shrink: 0;
 }
@@ -468,13 +469,15 @@ button.cfg-btn.ok:hover    { border-color: var(--green);  background: rgba(0,232
 
 /* ─── Log ────────────────────────────────────────────────────── */
 .event-log {
-  max-height: 140px; overflow-y: auto; font-size: 0.68rem; line-height: 1.7;
+  max-height: 180px; overflow: scroll; font-size: 0.68rem; line-height: 1.7;
   padding: 8px; background: var(--joy-box-bg);
-  border: 1px inset var(--border2);
-  box-shadow: inset 0 1px 3px #0006;
+  border: 1px solid var(--border2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
 }
-.event-log::-webkit-scrollbar { width: 4px; }
-.event-log::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.event-log::-webkit-scrollbar { width: 8px; }
+.event-log::-webkit-scrollbar-track { background: transparent; }
+.event-log::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
 .log-row { display: flex; gap: 10px; }
 .log-time { color: var(--text-dim); min-width: 72px; }
 .log-connect    { color: var(--green); }
@@ -574,6 +577,8 @@ function buildCfg(gp, type) {
     c.xAxis = n > 0 ? 0 : -1;
     c.yAxis = n > 1 ? 1 : -1;
     c.zAxis = n > 5 ? 5 : -1;
+    // Default hat to axis 9 if available
+    if (n > 9) c.hats = [{type:'single', axis: 9}];
   }
   return c;
 }
@@ -688,6 +693,11 @@ window.updateHatAxis = (field, val) => {
   const h = deviceCfgs[activeIndex].hats[0];
   h[field] = parseInt(val);
   deviceCfgs[activeIndex].version++;
+};
+
+window.toggleRawAxes = () => {
+  rawAxesCollapsed = !rawAxesCollapsed;
+  frame();
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -947,7 +957,7 @@ function frame() {
   }).join('');
 
   /* ── log ── */
-  const logHtml = eventLog.length ? `<div class="section"><div class="sec-title">Event Log</div>
+  const logHtml = eventLog.length ? `<div class="section" style="grid-column:1/-1"><div class="sec-title">Event Log</div>
     <div class="event-log">${eventLog.map(e=>
       `<div class="log-row"><span class="log-time">${e.t}</span>
        <span class="log-${e.type}">[${e.type.toUpperCase()}]</span>
@@ -956,8 +966,9 @@ function frame() {
 
   /* ── assemble ── */
   const stickTitle = c.type==='gamepad' ? 'Analog Sticks' : 'Primary Stick';
+  const stickColSpan = c.type==='gamepad' ? '2' : '1';
   livePanel.innerHTML = `<div class="sections">
-    <div class="section" style="grid-column:span 1">
+    <div class="section" style="grid-column:span ${stickColSpan}">
       <div class="sec-title">${stickTitle}</div>
       ${xyHtml}
     </div>
