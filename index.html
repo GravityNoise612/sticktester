@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Joystick Tester</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='28'>🕹️</text></svg>">
+<style>
+/* ─── Reset & Tokens ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d0d12;
+  --panel:     #13131c;
+  --panel2:    #1a1a26;
+  --border:    #252535;
+  --border2:   #32324a;
+  --accent:    #00d4ff;
+  --accent2:   #ff4d6a;
+  --accent3:   #7c5fff;
+  --green:     #00e87a;
+  --orange:    #ffaa30;
+  --text:      #c6c6d8;
+  --text-dim:  #50506a;
+  --text-bright:#e8e8f8;
+  --glow:      0 0 16px rgba(0,212,255,0.35);
+  --glow-sm:   0 0 8px  rgba(0,212,255,0.25);
+
+  /* joy.cpl palette extras */
+  --joy-box-bg:    #080810;
+  --joy-box-grid:  #1c1c2e;
+  --joy-cross:     #2a2a40;
+  --joy-dot:       #00d4ff;
+  --joy-dot2:      #7c5fff;
+  --joy-bar-bg:    #080810;
+  --joy-bar-fill:  #00d4ff;
+  --joy-bar-fill2: #7c5fff;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* subtle scanline */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px
+  );
+}
+
+.app {
+  position: relative; z-index: 1;
+  max-width: 1280px; margin: 0 auto; padding: 20px 24px 40px;
+}
+
+/* ─── Header ─────────────────────────────────────────────────── */
+header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 0 18px; border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+header .logo { font-size: 2rem; line-height: 1; }
+
+header h1 {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 1.25rem; font-weight: 700;
+  color: var(--text-bright); letter-spacing: 0.5px;
+}
+
+header p { color: var(--text-dim); font-size: 0.75rem; margin-top: 2px; }
+
+/* ─── Device Selector ────────────────────────────────────────── */
+.device-selector {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 18px;
+}
+
+.ds-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 2px;
+  color: var(--text-dim); margin-bottom: 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+.ds-count { color: var(--accent); font-size: 0.72rem; letter-spacing: 0; }
+
+.device-list { display: flex; flex-direction: column; gap: 6px; }
+
+.device-card {
+  display: grid; grid-template-columns: 22px 1fr auto;
+  gap: 12px; align-items: center;
+  padding: 10px 14px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--panel2);
+  cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.device-card:hover { border-color: rgba(0,212,255,0.35); }
+.device-card.active {
+  border-color: var(--accent); background: rgba(0,212,255,0.07);
+  box-shadow: var(--glow-sm);
+}
+
+.dc-radio {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s;
+}
+.device-card.active .dc-radio { border-color: var(--accent); }
+
+.dc-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: transparent; transition: background 0.15s;
+}
+.device-card.active .dc-dot { background: var(--accent); }
+
+.dc-name {
+  font-size: 0.82rem; font-weight: 600; color: var(--text-bright);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.device-card.active .dc-name { color: var(--accent); }
+
+.dc-meta { font-size: 0.68rem; color: var(--text-dim); margin-top: 1px; }
+
+.dc-badges { display: flex; gap: 6px; align-items: center; }
+
+.badge {
+  font-size: 0.58rem; text-transform: uppercase; letter-spacing: 1px;
+  padding: 2px 7px; border-radius: 10px;
+}
+.badge-gamepad  { background: rgba(124,95,255,0.12); color: var(--accent3); border: 1px solid rgba(124,95,255,0.3); }
+.badge-joystick { background: rgba(0,212,255,0.10); color: var(--accent);  border: 1px solid rgba(0,212,255,0.25); }
+.badge-ok       { background: rgba(0,232,122,0.10); color: var(--green);   border: 1px solid rgba(0,232,122,0.25); }
+
+.no-device-hint {
+  text-align: center; padding: 20px 10px;
+  color: var(--text-dim); font-size: 0.82rem; line-height: 1.7;
+}
+.no-device-hint .big { font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.5;
+  animation: blink 2s ease-in-out infinite; }
+
+@keyframes blink { 0%,100%{opacity:.3} 50%{opacity:.9} }
+
+/* ─── Config Panel ───────────────────────────────────────────── */
+.config-panel {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 18px;
+}
+
+.cfg-title {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 2px;
+  color: var(--text-dim); margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+}
+
+.cfg-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+
+.cfg-group { display: flex; align-items: center; gap: 6px; }
+
+.cfg-label {
+  font-size: 0.67rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+}
+
+select.cfg-sel, button.cfg-btn {
+  font-family: inherit; font-size: 0.72rem;
+  background: var(--joy-box-bg); color: var(--accent);
+  border: 1px solid var(--border2); border-radius: 4px;
+  padding: 4px 8px; outline: none; cursor: pointer;
+  transition: border-color 0.12s;
+}
+select.cfg-sel:hover, select.cfg-sel:focus,
+button.cfg-btn:hover { border-color: var(--accent); }
+select.cfg-sel option { background: var(--panel); color: var(--text); }
+
+button.cfg-btn.danger { color: var(--accent2); border-color: rgba(255,77,106,0.3); }
+button.cfg-btn.danger:hover { border-color: var(--accent2); background: rgba(255,77,106,0.08); }
+button.cfg-btn.ok    { color: var(--green);  border-color: rgba(0,232,122,0.3); }
+button.cfg-btn.ok:hover    { border-color: var(--green);  background: rgba(0,232,122,0.08); }
+
+.hat-cfg-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+/* ─── Live Display Grid ──────────────────────────────────────── */
+#live-display .sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.section {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px;
+}
+
+.sec-title {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px;
+  color: var(--text-dim); margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ─── joy.cpl XY PAD ────────────────────────────────────────── */
+.joy-layout {
+  display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;
+}
+
+/* The square XY area */
+.xy-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.xy-pad {
+  position: relative;
+  width: 200px; height: 200px;
+  background: var(--joy-box-bg);
+  border: 2px inset var(--border2);
+  box-shadow: inset 0 0 0 1px #0005, inset 2px 2px 6px #0008;
+  cursor: crosshair;
+  flex-shrink: 0;
+}
+
+/* grid lines */
+.xy-pad::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(var(--joy-box-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--joy-box-grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* center cross */
+.xy-pad::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--joy-cross) 1px, transparent 1px) 0 50% / 100% 1px no-repeat,
+    linear-gradient(90deg, var(--joy-cross) 1px, transparent 1px) 50% 0 / 1px 100% no-repeat;
+}
+
+/* outer border tick marks */
+.xy-ticks {
+  position: absolute; inset: 0; pointer-events: none;
+}
+
+.xy-cursor {
+  position: absolute;
+  width: 0; height: 0;
+  /* crosshair rendered as SVG overlay below — cursor is the intersection point */
+  transform: translate(-50%, -50%);
+  transition: left 0.04s linear, top 0.04s linear;
+  z-index: 4;
+}
+
+/* horizontal arm of crosshair */
+.xy-cursor::before {
+  content: '';
+  position: absolute;
+  width: 16px; height: 2px;
+  left: -8px; top: -1px;
+  background: var(--joy-dot);
+  box-shadow: 0 0 6px var(--joy-dot);
+}
+
+/* vertical arm */
+.xy-cursor::after {
+  content: '';
+  position: absolute;
+  width: 2px; height: 16px;
+  left: -1px; top: -8px;
+  background: var(--joy-dot);
+  box-shadow: 0 0 6px var(--joy-dot);
+}
+
+/* center dot of cursor */
+.xy-dot {
+  position: absolute;
+  width: 6px; height: 6px;
+  background: var(--joy-dot);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--joy-dot);
+  transform: translate(-50%, -50%);
+}
+
+.xy-cursor.dot2::before, .xy-cursor.dot2::after { background: var(--joy-dot2); box-shadow: 0 0 6px var(--joy-dot2); }
+.xy-dot.dot2 { background: var(--joy-dot2); box-shadow: 0 0 10px var(--joy-dot2); }
+
+.xy-coords {
+  font-size: 0.68rem; color: var(--text-dim); text-align: center;
+  font-variant-numeric: tabular-nums; line-height: 1.5;
+}
+
+/* ─── Vertical slider bar (Z / throttle / extra axes) ────────── */
+.joy-sliders {
+  display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;
+}
+
+.vslider-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+
+.vslider-track {
+  width: 26px; height: 200px;
+  background: var(--joy-bar-bg);
+  border: 2px inset var(--border2);
+  box-shadow: inset 0 0 0 1px #0005, inset 1px 1px 4px #0008;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* center notch on slider */
+.vslider-track::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 50%; height: 1px;
+  background: var(--joy-cross);
+}
+
+.vslider-fill {
+  position: absolute;
+  left: 0; right: 0;
+  background: var(--joy-bar-fill);
+  box-shadow: 0 0 6px var(--joy-bar-fill);
+  transition: top 0.04s linear, height 0.04s linear;
+}
+
+/* The thumb marker on the slider */
+.vslider-thumb {
+  position: absolute;
+  left: -3px; right: -3px; height: 4px;
+  background: var(--joy-bar-fill);
+  box-shadow: 0 0 8px var(--joy-bar-fill);
+  border-radius: 2px;
+  transition: top 0.04s linear;
+  transform: translateY(-50%);
+}
+
+.vslider-thumb.c2 { background: var(--joy-bar-fill2); box-shadow: 0 0 8px var(--joy-bar-fill2); }
+.vslider-fill.c2  { background: var(--joy-bar-fill2); box-shadow: 0 0 6px var(--joy-bar-fill2); }
+
+.vslider-label {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-dim); text-align: center; width: 32px;
+}
+.vslider-val {
+  font-size: 0.65rem; color: var(--accent); text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── joy.cpl Hat / POV ──────────────────────────────────────── */
+.hats-row { display: flex; gap: 20px; flex-wrap: wrap; }
+
+.hat-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.hat-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); }
+
+/* The 3x3 grid POV indicator — like joy.cpl */
+.hat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(3, 28px);
+  gap: 2px;
+  background: var(--joy-box-bg);
+  border: 2px inset var(--border2);
+  box-shadow: inset 0 0 0 1px #0005, inset 1px 1px 4px #0008;
+  padding: 2px;
+}
+
+.hat-cell {
+  background: var(--joy-box-bg);
+  border: 1px solid var(--border2);
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.5rem; color: var(--text-dim);
+  transition: background 0.06s, border-color 0.06s;
+}
+
+.hat-cell.center {
+  background: var(--panel2);
+  border-color: var(--border2);
+}
+
+.hat-cell.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0,212,255,0.5);
+}
+
+.hat-cell.center.active {
+  background: rgba(0,212,255,0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hat-val { font-size: 0.65rem; color: var(--text-dim); text-align: center; }
+
+/* ─── Trigger Bars (gamepad) ─────────────────────────────────── */
+.triggers-wrap { display: flex; gap: 14px; justify-content: center; }
+
+/* ─── Buttons ────────────────────────────────────────────────── */
+.buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+}
+
+.btn-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 4px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--joy-box-bg);
+  transition: border-color 0.06s, background 0.06s;
+}
+
+.btn-cell.pressed {
+  background: rgba(0,212,255,0.14);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 12px rgba(0,212,255,0.1), var(--glow-sm);
+}
+
+.btn-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--border2); background: var(--panel2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; font-weight: 700; color: var(--text-dim);
+  transition: all 0.06s;
+}
+
+.btn-cell.pressed .btn-circle {
+  border-color: var(--accent); background: var(--accent);
+  color: #000; box-shadow: 0 0 12px rgba(0,212,255,0.5);
+}
+
+.btn-name { font-size: 0.58rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.btn-val  { font-size: 0.52rem; color: var(--accent); }
+
+/* ─── Raw Axes ───────────────────────────────────────────────── */
+.raw-axes { display: flex; flex-direction: column; gap: 8px; }
+
+.raw-axis { display: flex; flex-direction: column; gap: 3px; }
+
+.ra-header { display: flex; justify-content: space-between; align-items: center; }
+
+.ra-name {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim);
+}
+.ra-tag { font-size: 0.55rem; color: var(--accent3); margin-left: 4px; }
+.ra-val { font-size: 0.7rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.ra-track {
+  height: 8px; background: var(--joy-box-bg);
+  border: 1px inset var(--border2);
+  box-shadow: inset 0 1px 3px #0006;
+  position: relative;
+}
+
+.ra-fill { position: absolute; top: 0; height: 100%; transition: left 0.04s linear, width 0.04s linear; }
+.ra-center { position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: var(--border2); }
+
+/* ─── Log ────────────────────────────────────────────────────── */
+.event-log {
+  max-height: 140px; overflow-y: auto; font-size: 0.68rem; line-height: 1.7;
+  padding: 8px; background: var(--joy-box-bg);
+  border: 1px inset var(--border2);
+  box-shadow: inset 0 1px 3px #0006;
+}
+.event-log::-webkit-scrollbar { width: 4px; }
+.event-log::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.log-row { display: flex; gap: 10px; }
+.log-time { color: var(--text-dim); min-width: 72px; }
+.log-connect    { color: var(--green); }
+.log-disconnect { color: var(--accent2); }
+.log-msg { color: var(--text); }
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .app { padding: 12px 14px 32px; }
+  .xy-pad { width: 160px; height: 160px; }
+  .vslider-track { height: 160px; }
+  .dc-badges .badge-joystick,
+  .dc-badges .badge-gamepad { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <span class="logo">🕹️</span>
+    <div>
+      <h1>Joystick Tester</h1>
+      <p>Web-based input device inspector · Joystick, HOTAS, Gamepad, Wheel</p>
+    </div>
+  </header>
+
+  <div id="device-selector" class="device-selector">
+    <div class="ds-title">
+      <span>Connected Devices</span>
+      <span class="ds-count" id="ds-count">0 found</span>
+    </div>
+    <div class="device-list" id="device-list">
+      <div class="no-device-hint">
+        <span class="big">🕹️</span>
+        Connect a joystick or gamepad, then press any button to activate it.<br>
+        Supports flight sticks, HOTAS, gamepads, racing wheels, and generic HID devices.
+      </div>
+    </div>
+  </div>
+
+  <div id="config-panel"></div>
+  <div id="live-display"></div>
+
+</div>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   State
+═══════════════════════════════════════════════════════════════ */
+let trackedPads = {};
+let activeIndex = null;
+let eventLog    = [];
+let animFrame   = null;
+let lastCount   = -1;
+let cfgDirty    = true;
+let lastCfgVer  = -1;
+
+const deviceCfgs = {};
+
+const AXIS_COLORS = [
+  '#00d4ff','#ff4d6a','#7c5fff','#ffaa30',
+  '#00e87a','#ff6e30','#e040fb','#64ffda'
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   Device type detection
+═══════════════════════════════════════════════════════════════ */
+function detectType(gp) {
+  if (gp.mapping === 'standard') return 'gamepad';
+  const id = gp.id.toLowerCase();
+  const jsKw = ['joystick','flight','hotas','throttle','stick','rudder',
+                'pedal','yoke','ch pro','thrustmaster','saitek','extreme',
+                'vkb','virpil','winwing','gladiator','warthog','cougar',
+                'mongoose','cobra','f16','f-16','f/a-18','x-52','x-55',
+                'x-56','x55','x56','x52','fcs'];
+  const gpKw = ['xbox','playstation','ps3','ps4','ps5','dualshock','dualsense',
+                'switch pro','gamepad','wireless controller','054c','045e','057e',
+                '8bitdo','retro-bit'];
+  for (const k of jsKw) if (id.includes(k)) return 'joystick';
+  for (const k of gpKw) if (id.includes(k)) return 'gamepad';
+  if (gp.axes.length <= 4 && gp.buttons.length >= 10) return 'gamepad';
+  return 'joystick';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Config helpers
+═══════════════════════════════════════════════════════════════ */
+function buildCfg(gp, type) {
+  const n = gp.axes.length;
+  const c = { type, version: 0, hats: [] };
+  if (type === 'gamepad') {
+    c.lx = n > 0 ? 0 : -1;
+    c.ly = n > 1 ? 1 : -1;
+    c.rx = n > 2 ? 2 : -1;
+    c.ry = n > 3 ? 3 : -1;
+  } else {
+    c.xAxis = n > 0 ? 0 : -1;
+    c.yAxis = n > 1 ? 1 : -1;
+    c.zAxis = n > 5 ? 5 : -1;
+  }
+  return c;
+}
+
+function getCfg(gp) {
+  if (!deviceCfgs[gp.index]) deviceCfgs[gp.index] = buildCfg(gp, detectType(gp));
+  return deviceCfgs[gp.index];
+}
+
+function getGPs() { return navigator.getGamepads ? navigator.getGamepads() : []; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Hat decoding
+═══════════════════════════════════════════════════════════════ */
+function hatDual(xv, yv) {
+  const t = 0.5;
+  const u = yv < -t, d = yv > t, l = xv < -t, r = xv > t;
+  if (u&&l) return 'nw'; if (u&&r) return 'ne';
+  if (d&&l) return 'sw'; if (d&&r) return 'se';
+  if (u) return 'n'; if (d) return 's';
+  if (l) return 'w'; if (r) return 'e';
+  return null;
+}
+
+function hatSingle(v) {
+  // VKB Gladiator axis 9 - single axis POV hat
+  // Measured cardinal values:
+  // Centered: 1.2857
+  // Up (N): -1.0
+  // Right (E): -0.4333
+  // Down (S): 0.1389
+  // Left (W): 0.7111
+  
+  // Center threshold: only very close to 1.2857 (±0.05)
+  if (Math.abs(v - 1.2857) < 0.08) return null;
+  
+  // Map to 8 directions
+  if (v < -0.87) return 'n';           // Up: -1.0
+  if (v < -0.57) return 'ne';          // NE: ~-0.717
+  if (v < -0.29) return 'e';           // Right: -0.4333
+  if (v < 0.04) return 'se';           // SE: ~-0.147
+  if (v < 0.29) return 's';            // Down: 0.1389
+  if (v < 0.57) return 'sw';           // SW: ~0.425
+  if (v < 1.0) return 'w';             // Left: 0.7111
+  if (v < 1.2857) return 'nw';         // NW: 1.0 to 1.2857
+  
+  return null;  // Center (at or very close to 1.2857)
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Logging
+═══════════════════════════════════════════════════════════════ */
+function log(type, msg) {
+  const t = new Date().toLocaleTimeString('en',{hour12:false});
+  eventLog.unshift({t, type, msg});
+  if (eventLog.length > 60) eventLog.pop();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DOM references
+═══════════════════════════════════════════════════════════════ */
+const dsCount    = document.getElementById('ds-count');
+const deviceList = document.getElementById('device-list');
+const cfgPanel   = document.getElementById('config-panel');
+const livePanel  = document.getElementById('live-display');
+
+/* ═══════════════════════════════════════════════════════════════
+   Global handlers (survive live-panel innerHTML rewrites)
+═══════════════════════════════════════════════════════════════ */
+window.selectDevice = idx => { activeIndex = idx; cfgDirty = true; refreshList(); };
+
+window.setCfg = (field, val) => {
+  if (activeIndex == null || !deviceCfgs[activeIndex]) return;
+  deviceCfgs[activeIndex][field] = parseInt(val);
+  deviceCfgs[activeIndex].version++;
+};
+
+window.setMode = type => {
+  if (activeIndex == null) return;
+  const gp = getGPs()[activeIndex]; if (!gp) return;
+  deviceCfgs[activeIndex] = buildCfg(gp, type);
+  cfgDirty = true;
+};
+
+window.setHatConfig = (type, axX, axY) => {
+  if (activeIndex == null || !deviceCfgs[activeIndex]) return;
+  const c = deviceCfgs[activeIndex];
+  if (type === 'none') {
+    c.hats = [];
+  } else if (type === 'single') {
+    // Auto-find available axis for hat
+    const gp = getGPs()[activeIndex];
+    if (!gp) return;
+    const n = gp.axes.length;
+    const used = new Set(
+      (c.type === 'gamepad' ? [c.lx,c.ly,c.rx,c.ry] : [c.xAxis,c.yAxis,c.zAxis])
+    );
+    let hatAxis = -1;
+    for (let i = 0; i < n; i++) {
+      if (!used.has(i)) { hatAxis = i; break; }
+    }
+    if (hatAxis >= 0) {
+      c.hats = [{type:'single', axis: hatAxis}];
+    }
+  }
+  c.version++;
+};
+
+window.updateHatAxis = (field, val) => {
+  if (activeIndex == null || !deviceCfgs[activeIndex]) return;
+  if (!deviceCfgs[activeIndex].hats.length) return;
+  const h = deviceCfgs[activeIndex].hats[0];
+  h[field] = parseInt(val);
+  deviceCfgs[activeIndex].version++;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Device list
+═══════════════════════════════════════════════════════════════ */
+function refreshList() {
+  const gps = Array.from(getGPs()).filter(Boolean);
+  dsCount.textContent = gps.length === 0 ? '0 found' : `${gps.length} found`;
+
+  if (!gps.length) {
+    deviceList.innerHTML = `<div class="no-device-hint">
+      <span class="big">🕹️</span>
+      Connect a joystick or gamepad and press any button to activate it.<br>
+      Supports flight sticks, HOTAS, gamepads, racing wheels, and generic HID devices.
+    </div>`;
+    return;
+  }
+
+  deviceList.innerHTML = gps.map(gp => {
+    const c  = getCfg(gp);
+    const act = gp.index === activeIndex;
+    const typeLabel = c.type === 'gamepad' ? 'Gamepad' : 'Joystick';
+    const badgeCls  = c.type === 'gamepad' ? 'badge-gamepad' : 'badge-joystick';
+    return `<div class="device-card ${act?'active':''}" onclick="selectDevice(${gp.index})">
+      <div class="dc-radio"><div class="dc-dot"></div></div>
+      <div>
+        <div class="dc-name">${gp.id}</div>
+        <div class="dc-meta">${gp.buttons.length} btn · ${gp.axes.length} axes · idx ${gp.index}</div>
+      </div>
+      <div class="dc-badges">
+        <span class="badge ${badgeCls}">${typeLabel}</span>
+        <span class="badge badge-ok">●</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Config panel — only redrawn when cfgDirty
+═══════════════════════════════════════════════════════════════ */
+function renderCfg(gp, c) {
+  const n = gp.axes.length;
+  const axOpts = sel => {
+    let h = `<option value="-1" ${sel===-1?'selected':''}>None</option>`;
+    for (let i=0;i<n;i++) h += `<option value="${i}" ${sel===i?'selected':''}>Axis ${i}</option>`;
+    return h;
+  };
+
+  let axCfg;
+  if (c.type === 'gamepad') {
+    axCfg = `<div class="cfg-row">
+      <div class="cfg-group"><span class="cfg-label">L-X</span><select class="cfg-sel" onchange="setCfg('lx',this.value)">${axOpts(c.lx)}</select></div>
+      <div class="cfg-group"><span class="cfg-label">L-Y</span><select class="cfg-sel" onchange="setCfg('ly',this.value)">${axOpts(c.ly)}</select></div>
+      <div class="cfg-group"><span class="cfg-label">R-X</span><select class="cfg-sel" onchange="setCfg('rx',this.value)">${axOpts(c.rx)}</select></div>
+      <div class="cfg-group"><span class="cfg-label">R-Y</span><select class="cfg-sel" onchange="setCfg('ry',this.value)">${axOpts(c.ry)}</select></div>
+    </div>`;
+  } else {
+    axCfg = `<div class="cfg-row">
+      <div class="cfg-group"><span class="cfg-label">X</span><select class="cfg-sel" onchange="setCfg('xAxis',this.value)">${axOpts(c.xAxis)}</select></div>
+      <div class="cfg-group"><span class="cfg-label">Y</span><select class="cfg-sel" onchange="setCfg('yAxis',this.value)">${axOpts(c.yAxis)}</select></div>
+      <div class="cfg-group"><span class="cfg-label">Z / Twist</span><select class="cfg-sel" onchange="setCfg('zAxis',this.value)">${axOpts(c.zAxis)}</select></div>
+    </div>`;
+  }
+
+  const h = c.hats.length > 0 ? c.hats[0] : null;
+  const hatCfg = `<div class="cfg-row">
+    <span class="cfg-label">Hat Switch</span>
+    <div class="cfg-group">
+      <select class="cfg-sel" onchange="setHatConfig(this.value)">
+        <option value="none" ${!h?'selected':''}>None</option>
+        <option value="single" ${h&&h.type==='single'?'selected':''}>Enabled</option>
+      </select>
+    </div>
+    ${h && h.type==='single' ? `
+      <div class="cfg-group"><span class="cfg-label">Axis</span><select class="cfg-sel" onchange="updateHatAxis('axis',this.value)">${axOpts(h.axis)}</select></div>
+    ` : ''}
+  </div>`;
+
+  cfgPanel.innerHTML = `<div class="config-panel">
+    <div class="cfg-title">
+      <span>Axis Mapping</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <div class="cfg-group"><span class="cfg-label">Mode</span>
+          <select class="cfg-sel" onchange="setMode(this.value)">
+            <option value="joystick" ${c.type==='joystick'?'selected':''}>Joystick</option>
+            <option value="gamepad"  ${c.type==='gamepad' ?'selected':''}>Gamepad</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    ${axCfg}
+    ${hatCfg}
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Live frame
+═══════════════════════════════════════════════════════════════ */
+function startLoop() {
+  if (animFrame) return;
+  (function loop() { animFrame = requestAnimationFrame(loop); frame(); })();
+}
+
+function frame() {
+  const gps  = Array.from(getGPs()).filter(Boolean);
+  const count = gps.length;
+
+  if (count !== lastCount) { lastCount = count; refreshList(); cfgDirty = true; }
+  if (!count) { cfgPanel.innerHTML = ''; livePanel.innerHTML = ''; return; }
+
+  if (activeIndex == null || !getGPs()[activeIndex]) {
+    activeIndex = gps[0].index; refreshList(); cfgDirty = true;
+  }
+
+  const gp = getGPs()[activeIndex];
+  const c  = getCfg(gp);
+  const n  = gp.axes.length;
+
+  if (cfgDirty || c.version !== lastCfgVer) {
+    renderCfg(gp, c);
+    lastCfgVer = c.version;
+    cfgDirty = false;
+  }
+
+  /* ── hat axes set ── */
+  const hatAx = new Set();
+  c.hats.forEach(h => h.type==='dual'
+    ? (hatAx.add(h.axisX), hatAx.add(h.axisY))
+    : hatAx.add(h.axis)
+  );
+
+  /* ── XY pad(s) ── */
+  let xyHtml = '';
+  if (c.type === 'gamepad') {
+    const lx=ax(gp,c.lx), ly=ax(gp,c.ly), rx=ax(gp,c.rx), ry=ax(gp,c.ry);
+    xyHtml = `<div class="joy-layout">
+      ${xyPad(lx,ly,'Left Stick','')}
+      ${xyPad(rx,ry,'Right Stick','dot2')}
+    </div>`;
+  } else {
+    const xv=ax(gp,c.xAxis), yv=ax(gp,c.yAxis);
+    xyHtml = `<div class="joy-layout">${xyPad(xv,yv,'X / Y','')}</div>`;
+  }
+
+  /* ── sliders ── */
+  let sliders = '';
+  if (c.type === 'joystick') {
+    // Z first, then remaining non-XY, non-hat axes
+    const shown = new Set([c.xAxis, c.yAxis]);
+    hatAx.forEach(a => shown.add(a));
+    const extras = [];
+    for (let i=0;i<n;i++) if(!shown.has(i)) extras.push(i);
+    if (extras.length) {
+      sliders = `<div class="joy-sliders">${extras.map((ai,ei) => {
+        const v   = gp.axes[ai];
+        const isZ = ai === c.zAxis;
+        const lbl = isZ ? 'Z' : `A${ai}`;
+        const cls = (ei===0 && isZ) ? '' : (ei>0?'c2':'');
+        return vSlider(v, lbl, cls);
+      }).join('')}</div>`;
+    }
+  } else {
+    // Gamepad: show trigger buttons 6,7 as vertical sliders
+    if (gp.buttons.length > 7) {
+      const lt = gp.buttons[6].value, rt = gp.buttons[7].value;
+      sliders = `<div class="joy-sliders">${vSlider(lt*2-1,'LT','')}${vSlider(rt*2-1,'RT','c2')}</div>`;
+    }
+  }
+
+  /* ── hat grid ── */
+  let hatsHtml = '';
+  if (c.hats.length) {
+    const h = c.hats[0];
+    let dir=null, raw='';
+    if (h.type==='dual') {
+      const hx=ax(gp,h.axisX), hy=ax(gp,h.axisY);
+      dir=hatDual(hx,hy); raw=`A${h.axisX}:${hx.toFixed(2)} / A${h.axisY}:${hy.toFixed(2)}`;
+    } else {
+      const hv=ax(gp,h.axis);
+      dir=hatSingle(hv); raw=`A${h.axis}:${hv.toFixed(4)}`;
+    }
+    hatsHtml = `<div class="section"><div class="sec-title">Hat Switch / POV</div>
+      <div class="hats-row">${hatGrid(dir, 'Hat', raw)}</div></div>`;
+  }
+
+  /* ── buttons ── */
+  const btnsHtml = gp.buttons.map((b,i) => {
+    const v = b.value;
+    return `<div class="btn-cell ${b.pressed?'pressed':''}">
+      <div class="btn-circle">${i}</div>
+      <div class="btn-name">B${i}</div>
+      ${v>0&&v<1?`<div class="btn-val">${v.toFixed(2)}</div>`:''}
+    </div>`;
+  }).join('');
+
+  /* ── raw axes ── */
+  const cfgTagMap = {};
+  if (c.type==='gamepad') {
+    if(c.lx>=0)cfgTagMap[c.lx]='L-X'; if(c.ly>=0)cfgTagMap[c.ly]='L-Y';
+    if(c.rx>=0)cfgTagMap[c.rx]='R-X'; if(c.ry>=0)cfgTagMap[c.ry]='R-Y';
+  } else {
+    if(c.xAxis>=0)cfgTagMap[c.xAxis]='X'; if(c.yAxis>=0)cfgTagMap[c.yAxis]='Y';
+    if(c.zAxis>=0)cfgTagMap[c.zAxis]='Z';
+  }
+  c.hats.forEach((h,hi) => {
+    if(h.type==='dual'){cfgTagMap[h.axisX]=`H${hi+1}`;cfgTagMap[h.axisY]=`H${hi+1}`;}
+    else cfgTagMap[h.axis]=`H${hi+1}`;
+  });
+
+  const rawHtml = gp.axes.map((v,i) => {
+    const col=AXIS_COLORS[i%AXIS_COLORS.length];
+    const tag=cfgTagMap[i]?`<span class="ra-tag">[${cfgTagMap[i]}]</span>`:'';
+    
+    // For hat axes (axis 9 on VKB), extend range to show full -1..1.2857 span
+    const isHat = c.hats.length && c.hats[0].type === 'single' && i === c.hats[0].axis;
+    
+    if (isHat) {
+      // Hat axis: extended range -1 to 1.2857
+      // Center is at 1.2857, so map to percentage of full range
+      const minVal = -1.0;
+      const maxVal = 1.2857;
+      const range = maxVal - minVal;  // 2.2857
+      
+      // Calculate position as percentage of range
+      const pct = ((v - minVal) / range) * 100;
+      
+      // Clamp to 0-100 for display
+      const clampedPct = Math.max(0, Math.min(100, pct));
+      
+      // Center marker at 1.2857 position
+      const centerPct = ((1.2857 - minVal) / range) * 100;  // Should be ~100
+      
+      return `<div class="raw-axis">
+        <div class="ra-header">
+          <span class="ra-name">Axis ${i}${tag}</span>
+          <span class="ra-val">${v.toFixed(4)}</span>
+        </div>
+        <div class="ra-track">
+          <div class="ra-center" style="left:${centerPct}%"></div>
+          <div class="ra-fill" style="left:0%;width:${clampedPct}%;background:${col}"></div>
+        </div>
+      </div>`;
+    } else {
+      // Standard axis: -1 to 1 range
+      const w=Math.abs(v)*50, left=v<0?50-w:50;
+      return `<div class="raw-axis">
+        <div class="ra-header">
+          <span class="ra-name">Axis ${i}${tag}</span>
+          <span class="ra-val">${v.toFixed(4)}</span>
+        </div>
+        <div class="ra-track">
+          <div class="ra-center"></div>
+          <div class="ra-fill" style="left:${left}%;width:${w}%;background:${col}"></div>
+        </div>
+      </div>`;
+    }
+  }).join('');
+
+  /* ── log ── */
+  const logHtml = eventLog.length ? `<div class="section"><div class="sec-title">Event Log</div>
+    <div class="event-log">${eventLog.map(e=>
+      `<div class="log-row"><span class="log-time">${e.t}</span>
+       <span class="log-${e.type}">[${e.type.toUpperCase()}]</span>
+       <span class="log-msg">${e.msg}</span></div>`
+    ).join('')}</div></div>` : '';
+
+  /* ── assemble ── */
+  const stickTitle = c.type==='gamepad' ? 'Analog Sticks' : 'Primary Stick';
+  livePanel.innerHTML = `<div class="sections">
+    <div class="section" style="grid-column:span 1">
+      <div class="sec-title">${stickTitle}</div>
+      ${xyHtml}
+    </div>
+    ${sliders ? `<div class="section" style="grid-column:span 1">
+      <div class="sec-title">${c.type==='gamepad'?'Triggers':'Extra Axes'}</div>
+      ${sliders}
+    </div>` : ''}
+    ${hatsHtml}
+    <div class="section" style="grid-column:1/-1">
+      <div class="sec-title">Buttons</div>
+      <div class="buttons-grid">${btnsHtml}</div>
+    </div>
+    <div class="section" style="grid-column:1/-1">
+      <div class="sec-title">All Axes (Raw)</div>
+      <div class="raw-axes">${rawHtml}</div>
+    </div>
+    ${logHtml}
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Component helpers
+═══════════════════════════════════════════════════════════════ */
+function ax(gp, idx) {
+  return (idx >= 0 && idx < gp.axes.length) ? gp.axes[idx] : 0;
+}
+
+function xyPad(xv, yv, label, dotCls) {
+  // Map -1..1 to 0..100%
+  const px = ((xv + 1) / 2 * 100).toFixed(2);
+  const py = ((yv + 1) / 2 * 100).toFixed(2);
+  return `<div class="xy-wrap">
+    <div class="xy-pad">
+      <div class="xy-cursor ${dotCls}" style="left:${px}%;top:${py}%">
+        <div class="xy-dot ${dotCls}"></div>
+      </div>
+    </div>
+    <div class="xy-coords">
+      <span style="color:var(--text-dim)">X</span> ${xv.toFixed(3)}
+      &nbsp;&nbsp;
+      <span style="color:var(--text-dim)">Y</span> ${yv.toFixed(3)}
+    </div>
+    <div style="font-size:0.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px">${label}</div>
+  </div>`;
+}
+
+function vSlider(v, label, cls) {
+  // v is -1..1. Fill from center toward value.
+  // joy.cpl style: thumb position tracks value, fill goes from center to thumb.
+  const pct     = ((v + 1) / 2 * 100);          // 0-100%
+  const midPct  = 50;
+  const fillTop  = Math.min(pct, midPct);
+  const fillH    = Math.abs(pct - midPct);
+  return `<div class="vslider-wrap">
+    <div class="vslider-label">${label}</div>
+    <div class="vslider-track">
+      <div class="vslider-fill ${cls}" style="top:${fillTop}%;height:${fillH}%"></div>
+      <div class="vslider-thumb ${cls}" style="top:${pct}%"></div>
+    </div>
+    <div class="vslider-val">${v.toFixed(3)}</div>
+  </div>`;
+}
+
+function hatGrid(activeDir, label, rawInfo) {
+  // 3x3 grid layout:
+  //  nw  n  ne
+  //   w  ·   e
+  //  sw  s  se
+  const cells = [
+    'nw','n','ne',
+     'w',null,'e',
+    'sw','s','se'
+  ];
+  
+  // Arrow symbols for each direction
+  const arrows = {
+    n:'↑',   ne:'↗',  e:'→',  se:'↘',
+    s:'↓',   sw:'↙',  w:'←',  nw:'↖'
+  };
+  
+  const cellsHtml = cells.map(d => {
+    if (d === null) {
+      const centered = activeDir === null;
+      return `<div class="hat-cell center ${centered?'active':''}">●</div>`;
+    }
+    return `<div class="hat-cell ${activeDir===d?'active':''}">${arrows[d]||''}</div>`;
+  }).join('');
+
+  return `<div class="hat-wrap">
+    <div class="hat-label">${label}</div>
+    <div class="hat-grid">${cellsHtml}</div>
+    <div class="hat-val">${activeDir ? activeDir.toUpperCase() : 'CENTER'}</div>
+    <div style="font-size:0.6rem;color:var(--text-dim)">${rawInfo}</div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Gamepad events + polling
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('gamepadconnected', e => {
+  trackedPads[e.gamepad.index] = true;
+  if (activeIndex == null) activeIndex = e.gamepad.index;
+  log('connect', `${e.gamepad.id} connected (idx ${e.gamepad.index})`);
+  cfgDirty = true; refreshList(); startLoop();
+});
+
+window.addEventListener('gamepaddisconnected', e => {
+  delete trackedPads[e.gamepad.index];
+  delete deviceCfgs[e.gamepad.index];
+  log('disconnect', `Gamepad idx ${e.gamepad.index} disconnected`);
+  if (activeIndex === e.gamepad.index) {
+    const ks = Object.keys(trackedPads).map(Number);
+    activeIndex = ks.length ? ks[0] : null;
+  }
+  cfgDirty = true; refreshList();
+});
+
+// Chrome requires polling to detect gamepads
+setInterval(() => {
+  let changed = false;
+  for (const gp of getGPs()) {
+    if (!gp) continue;
+    if (!trackedPads[gp.index]) {
+      trackedPads[gp.index] = true;
+      if (activeIndex == null) activeIndex = gp.index;
+      log('connect', `${gp.id} connected (idx ${gp.index})`);
+      changed = true; cfgDirty = true; startLoop();
+    }
+  }
+  for (const idx in trackedPads) {
+    if (!getGPs()[idx]) {
+      delete trackedPads[idx]; delete deviceCfgs[idx];
+      log('disconnect', `Gamepad idx ${idx} disconnected`);
+      if (activeIndex === Number(idx)) {
+        const ks = Object.keys(trackedPads).map(Number);
+        activeIndex = ks.length ? ks[0] : null;
+      }
+      changed = true; cfgDirty = true;
+    }
+  }
+  if (changed) refreshList();
+}, 500);
+</script>
+</body>
+</html>
