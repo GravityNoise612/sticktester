@@ -521,6 +521,7 @@ button.cfg-btn.ok:hover    { border-color: var(--green);  background: rgba(0,232
 
   <div id="config-panel"></div>
   <div id="live-display"></div>
+  <div id="event-log-panel"></div>
 
 </div>
 <script>
@@ -635,6 +636,25 @@ function log(type, msg) {
   const t = new Date().toLocaleTimeString('en',{hour12:false});
   eventLog.unshift({t, type, msg});
   if (eventLog.length > 60) eventLog.pop();
+  renderLog();
+}
+
+function renderLog() {
+  if (!eventLog.length) { logPanel.innerHTML = ''; return; }
+  if (eventLog.length === lastLogCount) return;
+  lastLogCount = eventLog.length;
+  const scrollEl = logPanel.querySelector('.event-log');
+  const scrollTop = scrollEl ? scrollEl.scrollTop : 0;
+  logPanel.innerHTML = `<div class="section" style="margin-top:16px">
+    <div class="sec-title">Event Log</div>
+    <div class="event-log">${eventLog.map(e=>
+      `<div class="log-row"><span class="log-time">${e.t}</span>
+       <span class="log-${e.type}">[${e.type.toUpperCase()}]</span>
+       <span class="log-msg">${e.msg}</span></div>`
+    ).join('')}</div>
+  </div>`;
+  const newScrollEl = logPanel.querySelector('.event-log');
+  if (newScrollEl) newScrollEl.scrollTop = scrollTop;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -644,6 +664,9 @@ const dsCount    = document.getElementById('ds-count');
 const deviceList = document.getElementById('device-list');
 const cfgPanel   = document.getElementById('config-panel');
 const livePanel  = document.getElementById('live-display');
+const logPanel   = document.getElementById('event-log-panel');
+
+let lastLogCount = -1;
 
 /* ═══════════════════════════════════════════════════════════════
    Global handlers (survive live-panel innerHTML rewrites)
@@ -956,14 +979,6 @@ function frame() {
     }
   }).join('');
 
-  /* ── log ── */
-  const logHtml = eventLog.length ? `<div class="section" style="grid-column:1/-1"><div class="sec-title">Event Log</div>
-    <div class="event-log">${eventLog.map(e=>
-      `<div class="log-row"><span class="log-time">${e.t}</span>
-       <span class="log-${e.type}">[${e.type.toUpperCase()}]</span>
-       <span class="log-msg">${e.msg}</span></div>`
-    ).join('')}</div></div>` : '';
-
   /* ── assemble ── */
   const stickTitle = c.type==='gamepad' ? 'Analog Sticks' : 'Primary Stick';
   const stickColSpan = c.type==='gamepad' ? '2' : '1';
@@ -985,7 +1000,6 @@ function frame() {
       <div class="sec-title">All Axes (Raw)</div>
       <div class="raw-axes">${rawHtml}</div>
     </div>
-    ${logHtml}
   </div>`;
 }
 
